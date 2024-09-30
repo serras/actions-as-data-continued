@@ -153,10 +153,6 @@ data class Attack(..., val damage: Int)
   - Conditions may involve cards
 ]
 
---
-
-## How do we model .grey[actions]?
-
 ---
 
 # 🤕 Damage
@@ -184,8 +180,8 @@ data class Damage(val points: Int): Action
 .code70[
 ```kotlin
 data class FlipCoin(
-  val ifHeads: Action,
-  val ifTails: Action
+  val ifHeads: () -> Action,
+  val ifTails: () -> Action
 ): Action
 ```
 ]
@@ -199,8 +195,8 @@ data class FlipCoin(
 .code70[
 ```kotlin
 val sightAction: Action = FlipCoin(
-  ifHeads = Damage(50),
-  ifTails = Damage(0)
+  ifHeads = { Damage(50) },
+  ifTails = { Damage(0) }
 )
 ```
 ]
@@ -220,35 +216,14 @@ We can simulate the coin flips
 tailrec fun Action.execute(): Int = when (this) {
   is Damage -> points
   is FlipCoin -> when (Random.nextBoolean()) {
-    true -> ifHeads.execute()
-    false -> ifTails.execute()
+    true -> ifHeads().execute()
+    false -> ifTails().execute()
   }
 }
 ```
 ]
 
 This is just _one_ of _many_ possible **interpretations**
-
----
-
-# 🪙 Coin flip
-
-We model each branch as one field
-
-.code70[
-```kotlin
-data class FlipCoin(
-  val ifHeads: Action,
-  val ifTails: Action
-): Action
-```
-]
-
-## Why use `Action` recursively?
-
---
-
-We can model several coin flips
 
 ---
 
@@ -264,58 +239,11 @@ We use _recursion_ to model looping
 ```kotlin
 fun stumpAction(): Action {
   fun worker(accumulatedDamage: Int): Action =
-      FlipCoin(ifHeads = worker(accumulatedDamage + 20),
-               ifTails = Damage(accumulatedDamage))
+      FlipCoin(ifHeads = { worker(accumulatedDamage + 20) },
+               ifTails = { Damage(accumulatedDamage)) }
   // start with 0 as damage
   return worker(0)
 }
-```
-]
-
----
-
-# 🔁 Repeat until tails
-
-<i><b>Stump:</b> Flip a coin until you get tails. Damage is 20 times the amount of heads.</i>
-
-😵‍💫 This code has a big problem!
-
-.code60[
-```kotlin
-fun stumpAction(): Action {
-  fun worker(accumulatedDamage: Int): Action =
-      FlipCoin(ifHeads = worker(accumulatedDamage + 20),
-               ifTails = Damage(accumulatedDamage))
-  // start with 0 as damage
-  return worker(0)
-}
-```
-]
-
----
-
-# 🔁 Repeat until tails
-
-_Defer_ execution of each branch until required
-
-.code70[
-```kotlin
-data class FlipCoin(
-  val ifHeads: () -> Action,
-  val ifTails: () -> Action
-): Action
-```
-]
-
---
-
-.code60[
-```kotlin
-  fun worker(accumulatedDamage: Int): Action = 
-    FlipCoin(
-      ifHeads = { worker(accumulatedDamage + 20) },
-      ifTails = { Damage(accumulatedDamage) }
-    )
 ```
 ]
 
@@ -620,8 +548,8 @@ suspend fun download(
 
 ## Why is this useful?
 
-It gives control to `download` to decide <br /> 
-_when_ to continue execution
+It gives control to decide
+_when_ and _how_ to continue execution
 
 --
 
@@ -630,17 +558,6 @@ The _main_ use is **cooperative concurrency** <br />
 
 - Non-blocking operations
 - Scheduling computations
-
----
-
-# ⛓️ Coroutines in Kotlin
-
-## Coroutines compose
-
-To call a `suspend` operation you just need to be inside another `suspend` function or block
-
-- The compiler rewrites the code accordingly
-- Benefit over explicit `async`/`await` model
 
 ---
 
